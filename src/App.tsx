@@ -1065,7 +1065,7 @@ function App() {
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
                 >
-                  {formatTime(currentTime)} / {formatTime(duration)}
+                  {formatTime(currentTime)} {/* / {formatTime(duration)} */}
                   <br />
                   {currentTime}
                 </div>
