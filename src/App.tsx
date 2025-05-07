@@ -789,6 +789,11 @@ function App() {
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   Upload transcript JSON file
                 </span>
+                {timings.length > 0 && (
+                  <span className="mt-2 text-sm text-green-600 dark:text-green-400">
+                    JSON input loaded
+                  </span>
+                )}
               </label>
             </div>
 
