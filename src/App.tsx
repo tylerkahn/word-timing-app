@@ -282,6 +282,8 @@ function App() {
   const [jsonInputText, setJsonInputText] = useState<string>("");
   const [jsonUrl, setJsonUrl] = useState<string>("");
   const [isLoadingJson, setIsLoadingJson] = useState(false);
+  const [persistWords, setPersistWords] = useState<boolean>(true);
+  const persistWordsRef = useRef<boolean>(persistWords);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioUrlRef = useRef<string>("");
@@ -560,28 +562,37 @@ function App() {
       return;
     }
 
-    const validCurrentWordTimings = tree.findOverlapping(time);
+    let validCurrentWordTimings = tree.findOverlapping(time);
+    if (!persistWordsRef.current) {
+      validCurrentWordTimings = validCurrentWordTimings.filter(
+        (w) => time <= w.end
+      );
+    }
+    /*
     console.log(
       "Found overlapping words:",
       validCurrentWordTimings.length,
       validCurrentWordTimings
-    );
+    );*/
 
     if (validCurrentWordTimings.length > 0) {
       // Get the sentence index of the first current word
       const currentSentenceIndex = validCurrentWordTimings[0].sentenceIndex;
-      console.log("Current sentence index:", currentSentenceIndex);
+      //console.log("Current sentence index:", currentSentenceIndex);
 
       // If we have a valid sentence index, find all words from that sentence
       if (currentSentenceIndex !== undefined) {
         const sentenceWords = timings.filter(
           (timing) => timing.sentenceIndex === currentSentenceIndex
         );
-        console.log("Words in current sentence:", sentenceWords.length);
+        //console.log("Words in current sentence:", sentenceWords.length);
         setCurrentSentenceWords(sentenceWords);
       }
 
       setCurrentWordTimings(validCurrentWordTimings);
+    } else if (!persistWordsRef.current) {
+      setCurrentSentenceWords([]);
+      setCurrentWordTimings([]);
     }
   };
 
@@ -885,6 +896,26 @@ function App() {
               )}
             </div>
 
+            {/* Persistence Checkbox */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="persistWords"
+                checked={persistWords}
+                onChange={(e) => {
+                  setPersistWords(e.target.checked);
+                  persistWordsRef.current = e.target.checked;
+                }}
+                className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <label
+                htmlFor="persistWords"
+                className="text-gray-700 dark:text-gray-300"
+              >
+                Persist word until next word
+              </label>
+            </div>
+
             {/* Audio Player */}
             {(audioFile || audioUrl) && (
               <div className="flex flex-col items-center gap-4">
@@ -1117,10 +1148,12 @@ function App() {
                 <pre className="text-green-400 font-mono text-sm whitespace-pre-wrap">
                   {JSON.stringify(currentWordTimings, null, 2)}
                 </pre>
-              ) : (
+              ) : (audioRef?.current?.currentTime || 0) === 0 ? (
                 <div className="text-gray-500 dark:text-gray-400 font-mono text-sm">
                   Waiting for words...
                 </div>
+              ) : (
+                <></>
               )}
             </div>
           </div>
