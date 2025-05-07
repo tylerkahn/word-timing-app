@@ -773,7 +773,7 @@ function App() {
               >
                 <Upload className="w-12 h-12 text-gray-400 dark:text-gray-500 mb-2" />
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Upload audio file (.mp3, .wav)
+                  Upload audio file
                 </span>
                 {audioFile && (
                   <span className="mt-2 text-sm text-green-600 dark:text-green-400">
