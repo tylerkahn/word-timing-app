@@ -327,7 +327,7 @@ function App() {
         }
         setError("");
       } else {
-        setError("Please upload a valid audio file (.mp3, .wav)");
+        setError("Please upload a valid audio file");
       }
     }
   };
