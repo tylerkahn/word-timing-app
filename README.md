@@ -8,7 +8,7 @@ A simple application for displaying text with word-by-word timing.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/word-timing-app.git
+git clone https://github.com/tylerkahn/word-timing-app.git
 cd word-timing-app
 ```
 
