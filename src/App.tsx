@@ -1055,7 +1055,7 @@ function App() {
                 </div>
                 <div
                   ref={timeDisplayRef}
-                  className={`text-sm font-mono px-4 py-2 rounded cursor-ns-resize select-none text-gray-900 dark:text-gray-100
+                  className={`text-sm font-mono px-4 text-center w-full py-2 rounded cursor-ns-resize select-none text-gray-900 dark:text-gray-100
                     ${
                       isDragging
                         ? "bg-indigo-100 dark:bg-indigo-900/50"
@@ -1067,7 +1067,7 @@ function App() {
                 >
                   {formatTime(currentTime)} {/* / {formatTime(duration)} */}
                   <br />
-                  {currentTime}
+                  {currentTime.toFixed(4)}
                 </div>
                 <div className="flex flex-wrap gap-2 justify-center max-w-2xl">
                   {currentSentenceWords.map((timing, index) => (
