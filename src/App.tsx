@@ -279,6 +279,9 @@ function App() {
   const [currentSentenceWords, setCurrentSentenceWords] = useState<
     WordTiming[]
   >([]);
+  const [jsonInputText, setJsonInputText] = useState<string>("");
+  const [jsonUrl, setJsonUrl] = useState<string>("");
+  const [isLoadingJson, setIsLoadingJson] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioUrlRef = useRef<string>("");
@@ -452,6 +455,45 @@ function App() {
     } catch (error) {
       console.error("Error processing JSON:", error);
       setError("Error processing the JSON data");
+    }
+  };
+
+  // Add handler for text area input
+  const handleJsonTextAreaInput = () => {
+    if (jsonInputText) {
+      handleJsonInput(jsonInputText);
+    } else {
+      setError("Please enter JSON data in the textarea");
+    }
+  };
+
+  // Add handler for JSON URL input
+  const handleJsonUrl = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const input = formData.get("jsonUrl") as string;
+
+    if (!input) {
+      setError("Please enter a valid URL for JSON");
+      return;
+    }
+
+    setIsLoadingJson(true);
+    try {
+      // Fetch JSON data from URL
+      const response = await fetch(input);
+      if (!response.ok) {
+        throw new Error("URL is not accessible");
+      }
+      const jsonData = await response.text();
+
+      // Process the fetched JSON data
+      handleJsonInput(jsonData);
+      setJsonUrl(input);
+    } catch (error) {
+      setError("Unable to load JSON. Please check if the URL is correct.");
+    } finally {
+      setIsLoadingJson(false);
     }
   };
 
@@ -750,13 +792,63 @@ function App() {
               </label>
             </div>
 
+            {/* JSON Text Input */}
+            <div className="space-y-2">
+              <textarea
+                placeholder={JSON.stringify(
+                  [
+                    { word: "hello", start: 0.0, end: 0.3, probability: 0.3 },
+                    { word: "world", start: 0.32, end: 1.0, probability: 0.9 },
+                  ],
+                  null,
+                  2
+                )}
+                value={jsonInputText}
+                onChange={(e) => setJsonInputText(e.target.value)}
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
+                rows={5}
+              />
+              <button
+                onClick={handleJsonTextAreaInput}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg transition-colors"
+              >
+                Process JSON
+              </button>
+            </div>
+
+            {/* JSON URL Input */}
+            <div className="space-y-2">
+              <form onSubmit={handleJsonUrl} className="flex gap-2">
+                <input
+                  type="text"
+                  name="jsonUrl"
+                  placeholder="Enter JSON URL (e.g., https://example.com/data.json)"
+                  className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  value={jsonUrl}
+                  onChange={(e) => setJsonUrl(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  disabled={isLoadingJson}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoadingJson ? "Loading..." : "Load JSON"}
+                </button>
+              </form>
+              {jsonUrl && (
+                <div className="text-sm text-green-600 dark:text-green-400">
+                  Loaded JSON from: {jsonUrl}
+                </div>
+              )}
+            </div>
+
             {/* Audio URL Input */}
             <div className="space-y-2">
               <form onSubmit={handleAudioUrl} className="flex gap-2">
                 <input
                   type="text"
                   name="audioUrl"
-                  placeholder="Enter key or full URL (e.g., 'my-job-123' or https://...)"
+                  placeholder="Enter Audio URL (e.g., https://...)"
                   className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   defaultValue={audioKey || audioUrl}
                 />
@@ -794,6 +886,7 @@ function App() {
                 <audio ref={audioRef} src={audioUrlRef.current} />
                 <div className="flex gap-6 items-center">
                   <div className="flex gap-4">
+                    {/*
                     <div className="relative">
                       <button
                         onClick={() => jumpToSentence("back")}
@@ -804,6 +897,19 @@ function App() {
                       </button>
                       <span className="absolute left-1/2 -translate-x-1/2 -bottom-4 text-[10px] text-gray-500 dark:text-gray-400">
                         ←Sent
+                      </span>
+                    </div>
+                    */}
+                    <div className="relative">
+                      <button
+                        onClick={() => jumpBack(10 * 60 * 1000)}
+                        className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-full p-2 transition-colors"
+                        title="Jump back 100 milliseconds"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                      <span className="absolute left-1/2 -translate-x-1/2 -bottom-4 text-[10px] text-gray-500 dark:text-gray-400">
+                        10m
                       </span>
                     </div>
                     <div className="relative">
@@ -839,7 +945,7 @@ function App() {
                         <RotateCcw className="w-3 h-3" />
                       </button>
                       <span className="absolute left-1/2 -translate-x-1/2 -bottom-4 text-[10px] text-gray-500 dark:text-gray-400">
-                        100
+                        100ms
                       </span>
                     </div>
                   </div>
@@ -852,7 +958,7 @@ function App() {
                       <RotateCcw className="w-5 h-5" />
                     </button>
                     <span className="absolute left-1/2 -translate-x-1/2 -bottom-4 text-[10px] text-gray-500 dark:text-gray-400">
-                      10
+                      10ms
                     </span>
                   </div>
                   <button
@@ -874,7 +980,7 @@ function App() {
                       <RotateCcw className="w-5 h-5 scale-x-[-1]" />
                     </button>
                     <span className="absolute left-1/2 -translate-x-1/2 -bottom-4 text-[10px] text-gray-500 dark:text-gray-400">
-                      10
+                      10ms
                     </span>
                   </div>
                   <div className="flex gap-4">
@@ -887,7 +993,7 @@ function App() {
                         <RotateCcw className="w-3 h-3 scale-x-[-1]" />
                       </button>
                       <span className="absolute left-1/2 -translate-x-1/2 -bottom-4 text-[10px] text-gray-500 dark:text-gray-400">
-                        100
+                        100ms
                       </span>
                     </div>
                     <div className="relative">
@@ -916,6 +1022,19 @@ function App() {
                     </div>
                     <div className="relative">
                       <button
+                        onClick={() => jumpForward(10 * 60 * 1000)}
+                        className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-full p-2 transition-colors"
+                        title="Skip ahead 100 milliseconds"
+                      >
+                        <RotateCcw className="w-3 h-3 scale-x-[-1]" />
+                      </button>
+                      <span className="absolute left-1/2 -translate-x-1/2 -bottom-4 text-[10px] text-gray-500 dark:text-gray-400">
+                        10m
+                      </span>
+                    </div>
+                    {/*
+                    <div className="relative">
+                      <button
                         onClick={() => jumpToSentence("forward")}
                         className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-full p-2 transition-colors"
                         title="Next sentence"
@@ -926,6 +1045,7 @@ function App() {
                         Sent→
                       </span>
                     </div>
+                    */}
                   </div>
                 </div>
                 <div
