@@ -9,7 +9,7 @@ import {
   SkipBack,
   SkipForward,
 } from "lucide-react";
-import type { Transcript, TranslatedWord } from "./types";
+import type { Transcript, TranslatedWord } from "../src/types";
 
 type WordTiming = {
   end: number;
