@@ -18,6 +18,7 @@ type WordTiming = {
   start: number;
   sentenceIndex?: number;
   probability?: number;
+  language?: "original" | "translated";
 };
 
 class IntervalNode {
@@ -195,7 +196,7 @@ function extractWordTimings(jsonInput: string): WordTiming[] {
             });
           });
         } else if (sentence?.words && Array.isArray(sentence.words)) {
-          sentence.words.forEach((word: any) => {
+          sentence.words.forEach((word: any, i: number) => {
             allWords.push({
               ...word,
               word: word.word,
@@ -203,6 +204,7 @@ function extractWordTimings(jsonInput: string): WordTiming[] {
               start: word.start,
               end: word.end,
               probability: word.confidence,
+              sentenceIndex: i,
             });
           });
         }
@@ -224,9 +226,9 @@ function extractWordTimings(jsonInput: string): WordTiming[] {
           });
         }
       } else if (elem.phrases) {
-        for (const sentence of transcript) {
+        for (const [i, sentence] of transcript.entries()) {
           for (const phrase of sentence.phrases) {
-            for (const item of [...phrase.original, ...phrase.translated])
+            for (const item of phrase.original) {
               allWords.push({
                 ...item,
                 word: item.word,
@@ -234,11 +236,26 @@ function extractWordTimings(jsonInput: string): WordTiming[] {
                 start: item.start,
                 end: item.end,
                 probability: item.confidence || item.probability,
+                language: "original",
+                sentenceIndex: i,
               });
+            }
+            for (const item of phrase.translated) {
+              allWords.push({
+                ...item,
+                word: item.word,
+                punctuated_word: item.punctuatedWord,
+                start: item.start,
+                end: item.end,
+                probability: item.confidence || item.probability,
+                language: "translated",
+                sentenceIndex: i,
+              });
+            }
           }
         }
       } else if (elem.words) {
-        transcript.forEach((sentence: any) => {
+        transcript.forEach((sentence: any, i: number) => {
           (sentence.words || sentence).forEach((word: any) => {
             allWords.push({
               ...word,
@@ -247,6 +264,7 @@ function extractWordTimings(jsonInput: string): WordTiming[] {
               start: word.start,
               end: word.end,
               probability: word.confidence || word.probability,
+              sentenceIndex: i,
             });
           });
         });
@@ -588,7 +606,9 @@ function App() {
       // If we have a valid sentence index, find all words from that sentence
       if (currentSentenceIndex !== undefined) {
         const sentenceWords = timings.filter(
-          (timing) => timing.sentenceIndex === currentSentenceIndex
+          (timing) =>
+            timing.sentenceIndex === currentSentenceIndex &&
+            (timing.language ? timing.language === "original" : true)
         );
         //console.log("Words in current sentence:", sentenceWords.length);
         setCurrentSentenceWords(sentenceWords);
@@ -1105,12 +1125,13 @@ function App() {
                   <br />
                   {currentTime.toFixed(4)}
                 </div>
-                <div className="flex flex-wrap gap-2 justify-center max-w-2xl">
-                  {currentSentenceWords.map((timing, index) => (
+                <div className="flex flex-wrap-reverse gap-2 justify-center max-w-2xl">
+                  {[...currentSentenceWords].reverse().map((timing, index) => (
                     <button
                       key={`${timing.start}-${index}`}
                       onClick={() => handleWordClick(timing)}
-                      className={`px-2 py-1 text-sm rounded transition-colors
+                      style={{ direction: "rtl" }}
+                      className={`px-2 py-1 text-xl rounded transition-colors
                         ${
                           currentTime >= timing.start &&
                           currentTime <= timing.end
