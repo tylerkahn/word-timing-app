@@ -94,11 +94,16 @@ class IntervalTree {
       result.push(node.data);
     }
 
+    // Only traverse left subtree if it might contain overlapping intervals
     if (node.left && point <= node.left.max + IntervalTree.EPSILON) {
       this._findOverlapping(node.left, point, result);
     }
 
-    this._findOverlapping(node.right, point, result);
+    // Only traverse right subtree if point is greater than or equal to the start of this node
+    // This prevents unnecessary recursion into right subtrees
+    if (node.right && point >= node.start - IntervalTree.EPSILON) {
+      this._findOverlapping(node.right, point, result);
+    }
   }
 }
 
