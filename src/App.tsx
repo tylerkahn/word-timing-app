@@ -1006,7 +1006,9 @@ function App() {
                   2
                 )}
                 value={jsonInputText}
-                onChange={(e) => setJsonInputText(e.target.value)}
+                onChange={(e) =>
+                  timings.length > 0 && setJsonInputText(e.target.value)
+                }
                 className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                 rows={5}
               />
@@ -1027,7 +1029,6 @@ function App() {
                   placeholder="Enter JSON URL (e.g., https://example.com/data.json)"
                   className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   value={jsonUrl}
-                  onChange={(e) => setJsonUrl(e.target.value)}
                 />
                 <button
                   type="submit"
