@@ -375,17 +375,16 @@ type SubphraseTiming = {
 
 function App() {
   // Add dark mode state and effect at the start of the component
-  /*
   useEffect(() => {
     // Set dark mode as default
     document.documentElement.classList.add("dark");
   }, []);
-  */
 
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string>("");
   const [audioKey, setAudioKey] = useState<string>("");
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [showMp3Warning, setShowMp3Warning] = useState(false);
   const [timings, setTimings] = useState<WordTiming[]>([]);
   const [subphraseTimings, setSubphraseTimings] = useState<SubphraseTiming[]>(
     []
@@ -463,6 +462,18 @@ function App() {
           audioRef.current.src = audioUrlRef.current;
           audioRef.current.load();
         }
+
+        // Check if the file is an MP3 and show warning
+        if (
+          file.type === "audio/mp3" ||
+          file.type === "audio/mpeg" ||
+          file.name.toLowerCase().endsWith(".mp3")
+        ) {
+          setShowMp3Warning(true);
+        } else {
+          setShowMp3Warning(false);
+        }
+
         setError("");
       } else {
         setError("Please upload a valid audio file");
@@ -936,7 +947,7 @@ function App() {
               >
                 <Upload className="w-12 h-12 text-gray-400 dark:text-gray-500 mb-2" />
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Upload audio file
+                  Upload audio file (wav is best, m4a and opus are ok)
                 </span>
                 {audioFile && (
                   <span className="mt-2 text-sm text-green-600 dark:text-green-400">
@@ -945,6 +956,18 @@ function App() {
                 )}
               </label>
             </div>
+            {showMp3Warning && (
+              <div className="w-full text-sm p-4 bg-orange-100 border-l-4 border-orange-500 text-orange-700 rounded">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  <p>
+                    <strong>Warning:</strong> MP3 files may have inaccurate
+                    playback timing in browsers, affecting word highlighting
+                    precision. For best results, consider using WAV format.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* JSON Upload */}
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
