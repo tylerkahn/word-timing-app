@@ -9,7 +9,7 @@ import {
   SkipBack,
   SkipForward,
 } from "lucide-react";
-import type { Transcript, TranslatedWord } from "./types";
+import type { SentenceTiming, Transcript, TranslatedWord } from "./types";
 
 type WordTiming = {
   end: number;
@@ -21,15 +21,15 @@ type WordTiming = {
   language?: "original" | "translated";
 };
 
-class IntervalNode {
+class IntervalNode<T extends { start: number; end: number }> {
   start: number;
   end: number;
   max: number;
-  data: WordTiming;
-  left: IntervalNode | null;
-  right: IntervalNode | null;
+  data: T;
+  left: IntervalNode<T> | null;
+  right: IntervalNode<T> | null;
 
-  constructor(timing: WordTiming) {
+  constructor(timing: T) {
     this.start = timing.start;
     this.end = timing.end;
     this.max = timing.end;
@@ -39,72 +39,83 @@ class IntervalNode {
   }
 }
 
-class IntervalTree {
-  root: IntervalNode | null;
+const EPSILON = 0.001;
+
+const iOSiPadOS =
+  navigator.platform?.startsWith("iP") ||
+  (navigator.platform?.startsWith("Mac") && navigator.maxTouchPoints > 4);
+
+class IntervalTree<T extends { start: number; end: number }> {
+  root: IntervalNode<T> | null;
   // Small epsilon value to handle floating point precision
-  private static EPSILON = 0.001;
+  private static EPSILON = EPSILON;
 
   constructor() {
     this.root = null;
   }
 
-  insert(timing: WordTiming) {
+  insert(timing: T) {
     const node = new IntervalNode(timing);
     if (!this.root) {
       this.root = node;
       return;
     }
-    this._insert(this.root, node);
-  }
 
-  private _insert(root: IntervalNode, node: IntervalNode) {
-    if (node.start < root.start) {
-      if (root.left === null) {
-        root.left = node;
+    // Iterative insertion instead of recursive
+    let current = this.root;
+    while (true) {
+      // Update max at each level
+      current.max = Math.max(current.max, node.end);
+
+      if (node.start < current.start) {
+        if (current.left === null) {
+          current.left = node;
+          break;
+        }
+        current = current.left;
       } else {
-        this._insert(root.left, node);
-      }
-    } else {
-      if (root.right === null) {
-        root.right = node;
-      } else {
-        this._insert(root.right, node);
+        if (current.right === null) {
+          current.right = node;
+          break;
+        }
+        current = current.right;
       }
     }
-    root.max = Math.max(root.max, node.end);
   }
 
-  findOverlapping(point: number): WordTiming[] {
-    const result: WordTiming[] = [];
-    this._findOverlapping(this.root, point, result);
+  findOverlapping(point: number): T[] {
+    const result: T[] = [];
+    if (!this.root) return result;
+
+    // Use stack for iterative traversal
+    const stack: IntervalNode<T>[] = [this.root];
+
+    while (stack.length > 0) {
+      const node = stack.pop()!;
+
+      // Skip if node's max is less than point (no overlapping intervals possible)
+      if (point > node.max + IntervalTree.EPSILON) continue;
+
+      // Check if point is within the current node's interval
+      if (
+        point >= node.start - IntervalTree.EPSILON &&
+        point <= node.end + IntervalTree.EPSILON
+      ) {
+        result.push(node.data);
+      }
+
+      // Push right child first (to process left child first when popping)
+      if (node.right && point >= node.start - IntervalTree.EPSILON) {
+        stack.push(node.right);
+      }
+
+      // Push left child if it might contain overlapping intervals
+      if (node.left && point <= node.left.max + IntervalTree.EPSILON) {
+        stack.push(node.left);
+      }
+    }
+
     return result;
-  }
-
-  private _findOverlapping(
-    node: IntervalNode | null,
-    point: number,
-    result: WordTiming[]
-  ) {
-    if (!node || point > node.max + IntervalTree.EPSILON) return;
-
-    // Check if point is within the interval, including epsilon boundaries
-    if (
-      point >= node.start - IntervalTree.EPSILON &&
-      point <= node.end + IntervalTree.EPSILON
-    ) {
-      result.push(node.data);
-    }
-
-    // Only traverse left subtree if it might contain overlapping intervals
-    if (node.left && point <= node.left.max + IntervalTree.EPSILON) {
-      this._findOverlapping(node.left, point, result);
-    }
-
-    // Only traverse right subtree if point is greater than or equal to the start of this node
-    // This prevents unnecessary recursion into right subtrees
-    if (node.right && point >= node.start - IntervalTree.EPSILON) {
-      this._findOverlapping(node.right, point, result);
-    }
   }
 }
 
@@ -158,6 +169,80 @@ function getProbabilityStyle(
   };
 }
 
+function extractSubphraseTimings(jsonInput: string): SubphraseTiming[] {
+  const parsedData = JSON.parse(jsonInput);
+  if (!Array.isArray(parsedData)) {
+    return [];
+  }
+  if (!("phrases" in parsedData[0])) {
+    return [];
+  }
+  const transcript: SentenceTiming[] = parsedData as SentenceTiming[];
+
+  const subphraseTimings: SubphraseTiming[] = [];
+
+  for (const sentence of transcript) {
+    for (const phrase of sentence.phrases) {
+      for (const subphrase of phrase.subphrases) {
+        const validTIndices = subphrase.translatedWordIndices.filter(
+          (x) => x !== -1
+        );
+        const tStartIndex = validTIndices.at(0);
+        const tEndIndex = validTIndices.at(-1);
+        const tStart =
+          tStartIndex !== undefined
+            ? phrase.translated.at(tStartIndex)!.start
+            : undefined;
+        const tEnd =
+          tEndIndex !== undefined
+            ? phrase.translated.at(tEndIndex)!.end
+            : undefined;
+
+        const validOIndices = subphrase.originalWordIndices.filter(
+          (x) => x !== -1
+        );
+        const oStartIndex = validOIndices.at(0);
+        const oEndIndex = validOIndices.at(-1);
+        const oStart =
+          oStartIndex !== undefined
+            ? phrase.original.at(oStartIndex)!.start
+            : undefined;
+        const oEnd =
+          oEndIndex !== undefined
+            ? phrase.original.at(oEndIndex)!.end
+            : undefined;
+        if (
+          tStart !== undefined &&
+          tEnd !== undefined &&
+          oStart !== undefined &&
+          oEnd !== undefined
+        ) {
+          const textOriginal = subphrase.originalWordIndices
+            .filter((i) => i !== -1)
+            .map((i) => phrase.original[i])
+            .map((w) => w.punctuatedWord || w.word)
+            .join(" ");
+          const textTranslated = subphrase.translatedWordIndices
+            .filter((i) => i !== -1)
+            .map((i) => phrase.translated[i])
+            .map((w) => w.punctuatedWord || w.word)
+            .join(" ");
+          subphraseTimings.push({
+            start: tStart,
+            end: tEnd,
+            textOriginal,
+            textTranslated,
+            startOriginal: oStart,
+            endOriginal: oEnd,
+          });
+        }
+      }
+    }
+  }
+
+  return subphraseTimings;
+}
+
 function extractWordTimings(jsonInput: string): WordTiming[] {
   try {
     const parsedData = JSON.parse(jsonInput);
@@ -165,6 +250,7 @@ function extractWordTimings(jsonInput: string): WordTiming[] {
       parsedData?.dubTranscript ||
       parsedData?.wordTimings ||
       parsedData?.segments ||
+      parsedData?.words ||
       parsedData;
     const allWords: WordTiming[] = [];
 
@@ -278,21 +364,38 @@ function extractWordTimings(jsonInput: string): WordTiming[] {
   }
 }
 
+type SubphraseTiming = {
+  start: number;
+  end: number;
+  startOriginal: number;
+  endOriginal: number;
+  textOriginal: string;
+  textTranslated: string;
+};
+
 function App() {
   // Add dark mode state and effect at the start of the component
+  /*
   useEffect(() => {
     // Set dark mode as default
     document.documentElement.classList.add("dark");
   }, []);
+  */
 
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string>("");
   const [audioKey, setAudioKey] = useState<string>("");
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [timings, setTimings] = useState<WordTiming[]>([]);
+  const [subphraseTimings, setSubphraseTimings] = useState<SubphraseTiming[]>(
+    []
+  );
   const [currentWordTimings, setCurrentWordTimings] = useState<WordTiming[]>(
     []
   );
+  const [currentSubphraseTimings, setCurrentSubphraseTimings] = useState<
+    SubphraseTiming[]
+  >([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string>("");
   const [currentTime, setCurrentTime] = useState(0);
@@ -311,7 +414,9 @@ function App() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioUrlRef = useRef<string>("");
   const jsonDisplayRef = useRef<HTMLDivElement>(null);
-  const intervalTreeRef = useRef<IntervalTree | null>(null);
+  const intervalTreeRef = useRef<IntervalTree<WordTiming> | null>(null);
+  const subphrasesIntervalTreeRef =
+    useRef<IntervalTree<SubphraseTiming> | null>(null);
   const rafRef = useRef<number>();
   const initialTime = useRef<number>(0);
   const dragStartY = useRef<number>(0);
@@ -332,10 +437,18 @@ function App() {
     console.log("Building interval tree with timings:", timings.length);
     intervalTreeRef.current = new IntervalTree();
     timings.forEach((timing) => {
-      console.log("Adding timing to tree:", timing);
+      //console.log("Adding timing to tree:", timing);
       intervalTreeRef.current?.insert(timing);
     });
   }, [timings]);
+
+  useEffect(() => {
+    subphrasesIntervalTreeRef.current = new IntervalTree();
+    for (const subphrase of subphraseTimings) {
+      //console.log("Adding subphrase to tree:", subphrase);
+      subphrasesIntervalTreeRef.current.insert(subphrase);
+    }
+  }, [subphraseTimings]);
 
   const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -469,6 +582,11 @@ function App() {
 
       // Extract word timings
       const extractedTimings = extractWordTimings(jsonValue);
+      const extractedSubphrases = extractSubphraseTimings(jsonValue);
+      if (extractedSubphrases.length > 0) {
+        console.log("Setting subphrase timings:", extractedSubphrases);
+        setSubphraseTimings(extractedSubphrases);
+      }
       if (extractedTimings.length > 0) {
         console.log("Setting timings:", extractedTimings);
         setTimings(extractedTimings);
@@ -566,6 +684,7 @@ function App() {
     setIsDragging(false);
   };
 
+  /*
   useEffect(() => {
     // Add global mouse up handler
     const handleGlobalMouseUp = () => {
@@ -577,6 +696,7 @@ function App() {
       window.removeEventListener("mouseup", handleGlobalMouseUp);
     };
   }, []);
+  */
 
   const updateCurrentWords = (time: number) => {
     const tree = intervalTreeRef.current;
@@ -590,6 +710,16 @@ function App() {
       validCurrentWordTimings = validCurrentWordTimings.filter(
         (w) => time <= w.end
       );
+    }
+
+    const validCurrentSubphraseTimings =
+      subphrasesIntervalTreeRef.current?.findOverlapping(time) || [];
+    if (
+      validCurrentSubphraseTimings.length > 0 ||
+      validCurrentWordTimings.filter((w) => w.language === "original").length >
+        0
+    ) {
+      setCurrentSubphraseTimings(validCurrentSubphraseTimings);
     }
     /*
     console.log(
@@ -613,8 +743,14 @@ function App() {
         //console.log("Words in current sentence:", sentenceWords.length);
         setCurrentSentenceWords(sentenceWords);
       }
-
-      setCurrentWordTimings(validCurrentWordTimings);
+      if (subphraseTimings.length > 0) {
+        // special case for my needs
+        setCurrentWordTimings(
+          validCurrentWordTimings.filter((t) => t.language === "original")
+        );
+      } else {
+        setCurrentWordTimings(validCurrentWordTimings);
+      }
     } else if (!persistWordsRef.current) {
       setCurrentSentenceWords([]);
       setCurrentWordTimings([]);
@@ -671,11 +807,13 @@ function App() {
 
       // Get precise current time without rounding
       const currentTime = audio.currentTime;
+      /*
       console.log(
         "Current time:",
         currentTime,
         "Looking for words at this time"
       );
+      */
       setCurrentTime(currentTime);
       updateCurrentWords(currentTime);
 
@@ -787,7 +925,7 @@ function App() {
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
               <input
                 type="file"
-                accept="audio/*"
+                accept={iOSiPadOS ? "" : "audio/*"}
                 onChange={handleAudioUpload}
                 className="hidden"
                 id="audio-upload"
@@ -1133,8 +1271,18 @@ function App() {
                       style={{ direction: "rtl" }}
                       className={`px-2 py-1 text-xl rounded transition-colors
                         ${
-                          currentTime >= timing.start &&
-                          currentTime <= timing.end
+                          (currentTime >= timing.start &&
+                            currentTime <= timing.end) ||
+                          (currentSubphraseTimings.length > 0 &&
+                            currentTime >=
+                              currentSubphraseTimings[0].start - EPSILON &&
+                            currentTime <=
+                              currentSubphraseTimings[0].end + EPSILON &&
+                            timing.start >=
+                              currentSubphraseTimings[0].startOriginal -
+                                EPSILON &&
+                            timing.end <=
+                              currentSubphraseTimings[0].endOriginal + EPSILON)
                             ? "bg-indigo-600 dark:bg-indigo-500 text-white"
                             : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
                         }`}
@@ -1147,7 +1295,7 @@ function App() {
             )}
 
             {/* Words Display */}
-            <div className="min-h-[100px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-6 flex items-center justify-center">
+            <div className="min-h-[140px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-6 flex items-center justify-center">
               <p className="text-2xl text-gray-900 dark:text-gray-100 text-center transition-all duration-300">
                 {currentWordTimings.length > 0
                   ? currentWordTimings.map((timing, index) => (
@@ -1158,9 +1306,16 @@ function App() {
                         </span>
                       </React.Fragment>
                     ))
-                  : isPlaying
+                  : isPlaying || currentSubphraseTimings.length > 0
                   ? ""
                   : "Words will appear here..."}
+                {currentSubphraseTimings.map((timing, i) => (
+                  <React.Fragment key={i}>
+                    {timing.textOriginal}
+                    {/*<br />
+                    {timing.textTranslated}*/}
+                  </React.Fragment>
+                ))}
               </p>
             </div>
 

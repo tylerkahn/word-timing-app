@@ -65,3 +65,65 @@ export type Transcript = {
   sentences: Sentence[];
   statistics: Statistics;
 };
+
+export type WordLevelTiming = {
+  word: string;
+  punctuatedWord: string;
+  start: number;
+  end: number;
+  probability?: number;
+  speaker?: number;
+};
+
+export type DiarizedWordLevelTiming = WordLevelTiming & {
+  speaker: number;
+};
+
+export type SentenceLevelTiming = {
+  start: number;
+  end: number;
+  words: WordLevelTiming[];
+};
+
+export type ReconciledWordLevelTiming = WordLevelTiming & {
+  language: "original" | "translated";
+};
+
+export type PhraseTiming = {
+  start: number;
+  end: number;
+  original: WordLevelTiming[];
+  translated: WordLevelTiming[];
+  subphrases: {
+    original: string;
+    translated: string;
+  }[];
+};
+
+export type PhraseTimingSubphrase = PhraseTiming["subphrases"][number];
+
+export type PhraseIndexedSubphrase = PhraseTimingSubphrase & {
+  originalWordIndices: number[];
+  translatedWordIndices: number[];
+};
+
+export type SubphraseIndexedPhraseTiming = PhraseTiming & {
+  subphrases: PhraseIndexedSubphrase[];
+};
+
+export type PhraseIndexedTimedSubphrase = PhraseIndexedSubphrase & {
+  originalStart: number | undefined;
+  originalEnd: number | undefined;
+  translatedStart: number | undefined;
+  translatedEnd: number | undefined;
+};
+
+export type SubphraseTimedPhraseTiming = PhraseTiming & {
+  subphrases: PhraseIndexedTimedSubphrase[];
+};
+
+export type SentenceTiming = {
+  start: number;
+  end: number;
+  phrases: SubphraseIndexedPhraseTiming[];
+};
